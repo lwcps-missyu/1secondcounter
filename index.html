@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>小學生 1 秒感體驗器 (廣東話 60秒提示版)</title>
+  <title>小學生 1 秒感體驗器 (廣東話 - 分鐘關卡版)</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -14,52 +14,83 @@
       min-height: 100vh;
       background-color: #f0f8ff;
       margin: 0;
+      transition: background-color 0.5s ease;
     }
 
-    h1 { color: #333; margin-bottom: 10px; }
-
-    /* 預設數字樣式：藍色 */
-    #number-display {
-      font-size: 8rem;
-      font-weight: bold;
-      color: #2563eb;
-      margin: 10px 0;
-      height: 160px;
-      line-height: 160px;
-      text-align: center;
-      transition: color 0.3s ease, transform 0.3s ease;
-    }
-
-    /* 當達到 60 秒或以上的提示樣式：亮紅色 + 放大效果 */
-    #number-display.minute-reached {
-      color: #dc2626;
-      text-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
-      transform: scale(1.08);
-    }
-
-    /* 廣東話口訣提示區域 */
-    #cantonese-text {
-      font-size: 2rem;
-      color: #4b5563;
-      height: 40px;
+    h1 {
+      color: #1e293b;
       margin-bottom: 5px;
     }
 
-    /* 60 秒提示文字區域 */
-    #minute-badge {
-      font-size: 1.25rem;
-      font-weight: bold;
-      color: #dc2626;
-      height: 30px;
-      margin-bottom: 15px;
-      visibility: hidden; /* 預設隱藏 */
+    .subtitle {
+      color: #64748b;
+      margin-top: 0;
+      margin-bottom: 20px;
     }
 
-    #minute-badge.show {
-      visibility: visible;
+    /* 數字顯示卡片 (預設藍色主題) */
+    .card {
+      background-color: #ffffff;
+      padding: 20px 40px;
+      border-radius: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 280px;
+      transition: all 0.5s ease;
+      border: 4px solid #3b82f6;
+    }
+
+    /* 滿整分鐘時的卡片主題 (耀眼黃金色) */
+    .card.minute-reached {
+      background-color: #fef3c7;
+      border-color: #f59e0b;
+      transform: scale(1.05);
+      box-shadow: 0 20px 30px -10px rgba(245, 158, 11, 0.3);
+    }
+
+    #number-display {
+      font-size: 8rem;
+      font-weight: 800;
+      color: #2563eb;
+      margin: 0;
+      line-height: 1;
+      transition: color 0.5s ease;
+    }
+
+    /* 滿整分鐘時的數字顏色 */
+    .minute-reached #number-display {
+      color: #d97706;
+    }
+
+    #cantonese-text {
+      font-size: 2rem;
+      color: #475569;
+      margin-top: 15px;
+      font-weight: 600;
+    }
+
+    /* 分鐘提示徽章 */
+    #minute-badge {
+      display: none;
+      margin-top: 15px;
+      padding: 8px 16px;
+      background-color: #f59e0b;
+      color: #ffffff;
+      font-size: 1.25rem;
+      font-weight: bold;
+      border-radius: 50px;
+      animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
     }
 
     .btn-container {
+      margin-top: 30px;
       display: flex;
       gap: 15px;
     }
@@ -86,19 +117,22 @@
 <body>
 
   <h1>⏱️ 1 秒感順數體驗 (廣東話)</h1>
+  <p class="subtitle">建立「1 秒」與「1 分鐘 = 60 秒」的時間概念</p>
   
-  <!-- 阿拉伯數字顯示區域 -->
-  <div id="number-display">0</div>
-  
-  <!-- 廣東話口訣提示區域 -->
-  <div id="cantonese-text">準備</div>
+  <div class="card" id="display-card">
+    <!-- 阿拉伯數字 -->
+    <div id="number-display">0</div>
+    
+    <!-- 廣東話口訣 -->
+    <div id="cantonese-text">準備</div>
 
-  <!-- 1分鐘提示訊息標籤 -->
-  <div id="minute-badge">🎉 60秒 = 1分鐘！已過1分鐘囉！</div>
+    <!-- 滿分鐘動態提示徽章 -->
+    <div id="minute-badge">🎉 1 分鐘 = 60 秒！</div>
+  </div>
 
   <div class="btn-container">
     <button id="start-btn" onclick="startCount()">開始數數</button>
-    <button id="stop-btn" onclick="stopCount()">停止</button>
+    <button id="stop-btn" onclick="stopCount()">停止鎖定</button>
   </div>
 
   <script>
@@ -107,7 +141,7 @@
     let cantoneseVoice = null;
     let audioCtx = null;
 
-    // 1. 初始化 Web Audio Context
+    // 初始化 Web Audio Context
     function initAudioContext() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -117,7 +151,7 @@
       }
     }
 
-    // 2. 載入廣東話 (zh-HK) 語音包
+    // 載入廣東話語音包
     function loadVoices() {
       if ('speechSynthesis' in window) {
         const voices = window.speechSynthesis.getVoices();
@@ -131,9 +165,9 @@
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
 
-    // 3. 阿拉伯數字轉廣東話口訣 (1 -> 一零零一)
+    // 將數字轉為廣東話四字口訣 (1 -> 一零零一)
     function formatCountToCantoneseText(num) {
-      const targetNum = 1000 + num; // 1 -> 1001
+      const targetNum = 1000 + num; 
       const digits = targetNum.toString().split('');
       const charMap = {
         '0': '零', '1': '一', '2': '二', '3': '三', '4': '四',
@@ -142,25 +176,28 @@
       return digits.map(d => charMap[d]).join('');
     }
 
-    // 4. 精準 1 秒聲音提示音 (Beep)
-    function playBeep() {
+    // 播放提示音 (Beep)
+    function playBeep(isMinuteMark = false) {
       if (!audioCtx) return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       
+      // 滿整分鐘時用更高的音調 (1200Hz)，平時為 (800Hz)
+      const freq = isMinuteMark ? 1200 : 800;
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.15);
 
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
+      osc.stop(audioCtx.currentTime + 0.15);
     }
 
-    // 5. 穩定廣東話語音發音
+    // 高穩定度廣東話語音發聲
     function speakCantoneseStable(text) {
       if (!('speechSynthesis' in window)) return;
 
@@ -177,21 +214,17 @@
         utterance.voice = cantoneseVoice;
       }
 
-      utterance.rate = 1.3; // 確保 4 個音節在 0.6 秒內完成
-      utterance.pitch = 1.0;
-
+      utterance.rate = 1.45; // 保持 1.45 語速避免隊列卡死
       window.speechSynthesis.speak(utterance);
     }
 
-    // 6. 啟動計時器
+    // 啟動計時器
     function startCount() {
       if (timerId !== null) return;
 
       initAudioContext();
       count = 0;
-
-      // 清除之前的 60 秒視覺提示樣式
-      resetDisplayStyle();
+      resetTheme(); // 啟動時重置主題
 
       runTick();
 
@@ -200,38 +233,53 @@
       }, 1000);
     }
 
-    // 7. 每秒的核心處理邏輯
+    // 每秒運算核心邏輯
     function runTick() {
       count++;
       const cantoneseText = formatCountToCantoneseText(count);
 
-      const numDisplay = document.getElementById('number-display');
-      const badgeDisplay = document.getElementById('minute-badge');
-
       // 更新阿拉伯數字與口訣
-      numDisplay.textContent = count;
+      document.getElementById('number-display').textContent = count;
       document.getElementById('cantonese-text').textContent = cantoneseText;
 
-      // 檢查是否達到 60 秒或以上
-      if (count >= 60) {
-        numDisplay.classList.add('minute-reached'); // 改變數字顏色為紅色
-        badgeDisplay.classList.add('show');          // 顯示 1 分鐘提示語
+      const card = document.getElementById('display-card');
+      const badge = document.getElementById('minute-badge');
+
+      // 🔍 檢查是否恰好到達整分鐘 (60, 120, 180...)
+      if (count > 0 && count % 60 === 0) {
+        const minutes = count / 60; // 計算這是第幾分鐘
+        
+        // 1. 切換為整分鐘金黃色主題
+        card.classList.add('minute-reached');
+
+        // 2. 更新並顯示提示徽章
+        badge.textContent = `🎉 ${minutes} 分鐘 = ${count} 秒！`;
+        badge.style.display = 'block';
+
+        // 3. 播放滿分鐘專屬高音叮聲
+        playBeep(true);
+      } else {
+        // 非整分鐘時，恢復一般狀態
+        card.classList.remove('minute-reached');
+        badge.style.display = 'none';
+        
+        // 播放一般節拍叮聲
+        playBeep(false);
       }
 
-      // 播放輕微對齊音 + 廣東話
-      playBeep();
+      // 朗讀廣東話口訣
       speakCantoneseStable(cantoneseText);
     }
 
-    // 8. 重置數字樣式與提示
-    function resetDisplayStyle() {
-      const numDisplay = document.getElementById('number-display');
-      const badgeDisplay = document.getElementById('minute-badge');
-      numDisplay.classList.remove('minute-reached');
-      badgeDisplay.classList.remove('show');
+    // 重置主題樣式
+    function resetTheme() {
+      const card = document.getElementById('display-card');
+      const badge = document.getElementById('minute-badge');
+      card.classList.remove('minute-reached');
+      badge.style.display = 'none';
     }
 
-    // 9. 停止計時器 (保留當前數字與顏色樣式)
+    // 停止計時 (畫面保持當刻數字與分鐘狀態)
     function stopCount() {
       if (timerId !== null) {
         clearInterval(timerId);
