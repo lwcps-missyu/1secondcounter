@@ -193,8 +193,8 @@
         utterance.voice = cantoneseVoice;
       }
 
-      // Fast rate (1.4) guarantees '一零零一' finishes in ~0.6s, giving engine 0.4s buffer
-      utterance.rate = 1.4;
+      // Fast rate (1.45) guarantees '一零零一' finishes in ~0.5s, giving engine 0.4s buffer
+      utterance.rate = 1.45;
       utterance.pitch = 1.0;
 
       window.speechSynthesis.speak(utterance);
