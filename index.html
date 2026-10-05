@@ -174,39 +174,37 @@
     }
 
  /**
- * 高可靠性廣東話語音合成（已解決連續播放停頓問題）
- */
-function speakCantoneseWord(text) {
-  if (!('speechSynthesis' in window)) return;
+     * High-reliability Cantonese voice synthesis without dropping sounds
+     */
+    function speakCantoneseWord(text) {
+      if (!('speechSynthesis' in window)) return;
 
-  const synth = window.speechSynthesis;
+      // 確保語音沒有被暫停
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
 
-  // 1. 若語音引擎處於暫停狀態，強制恢復
-  if (synth.paused) {
-    synth.resume();
-  }
+      // 優化：只有當系統正在發音時才取消前一個語音，避免過度干擾引擎導致停頓
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
 
-  // 2. 只有在「前一個數字還沒念完」時才強制在中斷，避免無謂 cancel 導致引擎重置延遲
-  if (synth.speaking) {
-    synth.cancel();
-  }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-HK';
 
-  // 3. 建立語音物件
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-HK';
+      if (cantoneseVoice) {
+        utterance.voice = cantoneseVoice;
+      }
 
-  if (cantoneseVoice) {
-    utterance.voice = cantoneseVoice;
-  }
+      // 保持稍微快一點的語速，讓發音俐落
+      utterance.rate = 1.45;
+      utterance.pitch = 1.0;
 
-  // 4. 參數設定
-  utterance.rate = 1.5;   // 語速：1.5 倍速，確保 0.4 秒內發音完畢
-  utterance.pitch = 1.0;  // 音調：標準 1.0
-  utterance.volume = 1.0; // 音量：最大 1.0
-
-  // 5. 立即發送給語音引擎播放
-  synth.speak(utterance);
-}
+      // 優化：給予瀏覽器 10 毫秒的微小緩衝時間，能大幅減少發音啟動的卡頓感
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 10);
+    }
 
     /**
      * Trigger single 1-second pulse tick
@@ -263,37 +261,36 @@ function speakCantoneseWord(text) {
       timerId = setTimeout(step, nextDelay);
     }
 
-    /**
- * 開始數數計時器（含零延遲暖機機制）
- */
-function startCounting() {
-  if (timerId !== null) return;
+/**
+     * Start Count Timer with precision setInterval & Speech Warm-up
+     */
+    function startCounting() {
+      if (timerId !== null) return;
 
-  // 啟動 Web Audio API 上下文
-  getAudioContext();
+      getAudioContext();
+      
+      // --- 新增：語音引擎暖機 (Warm-up) 機制 ---
+      // 在使用者按下按鈕的瞬間，發送一個極短/無聲的請求，喚醒語音引擎
+      if ('speechSynthesis' in window) {
+        const warmupUtterance = new SpeechSynthesisUtterance('');
+        warmupUtterance.volume = 0; // 設定為無聲
+        window.speechSynthesis.speak(warmupUtterance);
+      }
+      // ----------------------------------------
 
-  // 語音引擎預熱（Warm-up）：發送極短字元活化音訊通道
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.resume();
-    const warmup = new SpeechSynthesisUtterance(' ');
-    warmup.volume = 0.01; // 設定極低音量進行暖機
-    warmup.rate = 2.0;
-    window.speechSynthesis.speak(warmup);
-  }
+      count = 0;
 
-  count = 0;
+      // Update status UI
+      const badge = document.getElementById('status-badge');
+      badge.textContent = "⏱️ 計時進行中...";
+      badge.className = "px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse shadow-sm";
 
-  // 更新介面狀態標籤
-  const badge = document.getElementById('status-badge');
-  badge.textContent = "⏱️ 計時進行中...";
-  badge.className = "px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse shadow-sm";
-
-  // 紀錄預期的絕對時間基準線
-  expectedTickTime = Date.now();
-  
-  // 啟動自適應計時器
-  step();
-}
+      // 記錄時間基準線 (搭配上一次教你的自適應計時器)
+      expectedTickTime = Date.now();
+      
+      // 開始執行計時循環
+      step();
+    }
     /**
      * Stop Counting
      */
