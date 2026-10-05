@@ -102,10 +102,12 @@
     let timerId = null;
     let audioCtx = null;
     let cantoneseVoice = null;
-    let lastTickTime = 0;
+    
+    // 新增：用來記錄下一次應該執行的絕對時間
+    let expectedTickTime = 0; 
 
     /**
-     * Initialize Web Audio Context to prevent audio scheduling blocks
+     * Initialize Web Audio Context
      */
     function getAudioContext() {
       if (!audioCtx) {
@@ -124,7 +126,6 @@
     function loadVoices() {
       if ('speechSynthesis' in window) {
         const voices = window.speechSynthesis.getVoices();
-        // Priority to Hong Kong Cantonese (zh-HK)
         cantoneseVoice = voices.find(v => v.lang === 'zh-HK' || v.lang === 'zh_HK') ||
                          voices.find(v => v.lang.includes('HK') || v.lang.includes('yue')) ||
                          voices.find(v => v.lang.includes('zh')) || null;
@@ -137,7 +138,7 @@
     }
 
     /**
-     * Formats count (1 -> "一零零一", 12 -> "一零一二")
+     * Formats count (1 -> "一零零一")
      */
     function formatToCantoneseMantra(num) {
       const targetNum = 1000 + num;
@@ -150,7 +151,7 @@
     }
 
     /**
-     * Precise Web Audio Beep synth for zero jitter 1s cadence
+     * Precise Web Audio Beep
      */
     function playPrecisionBeep() {
       const ctx = getAudioContext();
@@ -160,7 +161,7 @@
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // High pitch A5 note
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
 
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
@@ -173,17 +174,15 @@
     }
 
     /**
-     * High-reliability Cantonese voice synthesis without dropping sounds
+     * High-reliability Cantonese voice synthesis
      */
     function speakCantoneseWord(text) {
       if (!('speechSynthesis' in window)) return;
 
-      // Resume synth if stuck
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
 
-      // Flush queue safely to avoid hanging audio queue
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -193,7 +192,6 @@
         utterance.voice = cantoneseVoice;
       }
 
-      // Fast rate (1.45) guarantees '一零零一' finishes in ~0.5s, giving engine 0.4s buffer
       utterance.rate = 1.45;
       utterance.pitch = 1.0;
 
@@ -205,7 +203,6 @@
      */
     function tick() {
       count++;
-
       const mantraText = formatToCantoneseMantra(count);
 
       // 1. Update UI Elements
@@ -216,9 +213,8 @@
       numElem.textContent = count;
       textElem.textContent = mantraText;
 
-      // Visual Beat Pulse Animation
       numElem.classList.remove('beat-pulse');
-      void numElem.offsetWidth; // Trigger reflow
+      void numElem.offsetWidth; 
       numElem.classList.add('beat-pulse');
 
       beatInd.className = "absolute top-4 right-4 w-4 h-4 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50";
@@ -226,19 +222,39 @@
         beatInd.className = "absolute top-4 right-4 w-4 h-4 rounded-full bg-slate-300 transition-colors duration-200";
       }, 200);
 
-      // 2. Play Precise Beep
+      // 2. Play Audio
       if (document.getElementById('beep-toggle').checked) {
         playPrecisionBeep();
       }
 
-      // 3. Play Cantonese Voice Speech
+      // 3. Play Speech
       if (document.getElementById('speech-toggle').checked) {
         speakCantoneseWord(mantraText);
       }
     }
 
     /**
-     * Start Count Timer with precision setInterval
+     * 自適應計時器核心邏輯 (取代原本的 setInterval)
+     */
+    function step() {
+      // 執行當下這一拍
+      tick();
+
+      // 計算下一次應該執行的絕對時間 (加上 1000 毫秒)
+      expectedTickTime += 1000;
+      
+      // 計算目前的延遲誤差 (Drift)
+      const drift = Date.now() - expectedTickTime;
+      
+      // 下一次的等待時間扣除誤差，如果誤差太大(超過1秒)則歸零避免連跳
+      const nextDelay = Math.max(0, 1000 - drift);
+
+      // 使用 setTimeout 來排定下一次執行
+      timerId = setTimeout(step, nextDelay);
+    }
+
+    /**
+     * Start Count Timer
      */
     function startCounting() {
       if (timerId !== null) return;
@@ -246,38 +262,33 @@
       getAudioContext();
       count = 0;
 
-      // Update status UI
       const badge = document.getElementById('status-badge');
       badge.textContent = "⏱️ 計時進行中...";
       badge.className = "px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse shadow-sm";
 
-      // First immediate tick
-      tick();
-
-      // Precision 1000ms cadence loop
-      timerId = setInterval(() => {
-        tick();
-      }, 1000);
+      // 設定第一次預期的時間為「現在」
+      expectedTickTime = Date.now();
+      
+      // 開始執行計時循環
+      step();
     }
 
     /**
-     * Stop Counting and lock screen on stopped number
+     * Stop Counting
      */
     function stopCounting() {
       if (timerId !== null) {
-        clearInterval(timerId);
+        clearTimeout(timerId); // 注意：這裡改用 clearTimeout
         timerId = null;
       }
 
-      // Cancel ongoing voice
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
 
-      // Update badge UI without resetting current display number
       const badge = document.getElementById('status-badge');
       if (count > 0) {
-        badge.textContent = `⏸️ 已鎖定於 ${count} 秒`;
+        badge.textContent = `⏸️️ 已鎖定於 ${count} 秒`;
         badge.className = "px-4 py-1.5 rounded-full text-sm font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-sm";
       } else {
         badge.textContent = "尚未開始";
