@@ -173,17 +173,21 @@
       osc.stop(ctx.currentTime + 0.08);
     }
 
-    /**
-     * High-reliability Cantonese voice synthesis
+ /**
+     * High-reliability Cantonese voice synthesis without dropping sounds
      */
     function speakCantoneseWord(text) {
       if (!('speechSynthesis' in window)) return;
 
+      // 確保語音沒有被暫停
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
 
-      window.speechSynthesis.cancel();
+      // 優化：只有當系統正在發音時才取消前一個語音，避免過度干擾引擎導致停頓
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-HK';
@@ -192,10 +196,14 @@
         utterance.voice = cantoneseVoice;
       }
 
+      // 保持稍微快一點的語速，讓發音俐落
       utterance.rate = 1.45;
       utterance.pitch = 1.0;
 
-      window.speechSynthesis.speak(utterance);
+      // 優化：給予瀏覽器 10 毫秒的微小緩衝時間，能大幅減少發音啟動的卡頓感
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 10);
     }
 
     /**
@@ -254,19 +262,30 @@
     }
 
     /**
-     * Start Count Timer
+     * Start Count Timer with precision setInterval & Speech Warm-up
      */
     function startCounting() {
       if (timerId !== null) return;
 
       getAudioContext();
+      
+      // --- 新增：語音引擎暖機 (Warm-up) 機制 ---
+      // 在使用者按下按鈕的瞬間，發送一個極短/無聲的請求，喚醒語音引擎
+      if ('speechSynthesis' in window) {
+        const warmupUtterance = new SpeechSynthesisUtterance('');
+        warmupUtterance.volume = 0; // 設定為無聲
+        window.speechSynthesis.speak(warmupUtterance);
+      }
+      // ----------------------------------------
+
       count = 0;
 
+      // Update status UI
       const badge = document.getElementById('status-badge');
       badge.textContent = "⏱️ 計時進行中...";
       badge.className = "px-4 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse shadow-sm";
 
-      // 設定第一次預期的時間為「現在」
+      // 記錄時間基準線 (搭配上一次教你的自適應計時器)
       expectedTickTime = Date.now();
       
       // 開始執行計時循環
